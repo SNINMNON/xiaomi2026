@@ -1,0 +1,4 @@
+CompileFlags:
+  CompilationDatabase: demo/Project/CMAKE_Project/build
+  Add:
+    - --target=arm-none-eabi

@@ -1,0 +1,3 @@
+D:/Desktop/single_board/single_board/StudyGuard_A_U1P/demo/Project/CMAKE_Project/build_sg/CMakeFiles/STUDYGUARD_A_U1P.dir
+D:/Desktop/single_board/single_board/StudyGuard_A_U1P/demo/Project/CMAKE_Project/build_sg/CMakeFiles/edit_cache.dir
+D:/Desktop/single_board/single_board/StudyGuard_A_U1P/demo/Project/CMAKE_Project/build_sg/CMakeFiles/rebuild_cache.dir
