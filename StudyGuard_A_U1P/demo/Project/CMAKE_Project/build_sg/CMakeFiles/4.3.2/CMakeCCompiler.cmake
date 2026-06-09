@@ -1,4 +1,4 @@
-set(CMAKE_C_COMPILER "C:/Users/HP/scoop/apps/gcc-arm-none-eabi/current/bin/arm-none-eabi-gcc.exe")
+set(CMAKE_C_COMPILER "C:/Users/15313/scoop/apps/gcc-arm-none-eabi/current/bin/arm-none-eabi-gcc.exe")
 set(CMAKE_C_COMPILER_ARG1 "")
 set(CMAKE_C_COMPILER_ID "GNU")
 set(CMAKE_C_COMPILER_VERSION "15.2.1")
@@ -24,11 +24,11 @@ set(CMAKE_C_COMPILER_ARCHITECTURE_ID "armv7")
 
 
 
-set(CMAKE_AR "C:/Users/HP/scoop/apps/gcc-arm-none-eabi/current/bin/arm-none-eabi-ar.exe")
-set(CMAKE_C_COMPILER_AR "C:/Users/HP/scoop/apps/gcc-arm-none-eabi/current/bin/arm-none-eabi-gcc-ar.exe")
-set(CMAKE_RANLIB "C:/Users/HP/scoop/apps/gcc-arm-none-eabi/current/bin/arm-none-eabi-ranlib.exe")
-set(CMAKE_C_COMPILER_RANLIB "C:/Users/HP/scoop/apps/gcc-arm-none-eabi/current/bin/arm-none-eabi-gcc-ranlib.exe")
-set(CMAKE_LINKER "C:/Users/HP/scoop/apps/gcc-arm-none-eabi/current/bin/arm-none-eabi-ld.exe")
+set(CMAKE_AR "C:/Users/15313/scoop/apps/gcc-arm-none-eabi/current/bin/arm-none-eabi-ar.exe")
+set(CMAKE_C_COMPILER_AR "C:/Users/15313/scoop/apps/gcc-arm-none-eabi/current/bin/arm-none-eabi-gcc-ar.exe")
+set(CMAKE_RANLIB "C:/Users/15313/scoop/apps/gcc-arm-none-eabi/current/bin/arm-none-eabi-ranlib.exe")
+set(CMAKE_C_COMPILER_RANLIB "C:/Users/15313/scoop/apps/gcc-arm-none-eabi/current/bin/arm-none-eabi-gcc-ranlib.exe")
+set(CMAKE_LINKER "C:/Users/15313/scoop/apps/gcc-arm-none-eabi/current/bin/arm-none-eabi-ld.exe")
 set(CMAKE_LINKER_LINK "")
 set(CMAKE_LINKER_LLD "")
 set(CMAKE_C_COMPILER_LINKER "NOTFOUND")
@@ -79,7 +79,7 @@ endif()
 
 
 
-set(CMAKE_C_IMPLICIT_INCLUDE_DIRECTORIES "C:/Users/HP/scoop/apps/gcc-arm-none-eabi/15.2.rel1/lib/gcc/arm-none-eabi/15.2.1/include;C:/Users/HP/scoop/apps/gcc-arm-none-eabi/15.2.rel1/lib/gcc/arm-none-eabi/15.2.1/include-fixed;C:/Users/HP/scoop/apps/gcc-arm-none-eabi/15.2.rel1/arm-none-eabi/include")
+set(CMAKE_C_IMPLICIT_INCLUDE_DIRECTORIES "C:/Users/15313/scoop/apps/gcc-arm-none-eabi/15.2.rel1/lib/gcc/arm-none-eabi/15.2.1/include;C:/Users/15313/scoop/apps/gcc-arm-none-eabi/15.2.rel1/lib/gcc/arm-none-eabi/15.2.1/include-fixed;C:/Users/15313/scoop/apps/gcc-arm-none-eabi/15.2.rel1/arm-none-eabi/include")
 set(CMAKE_C_IMPLICIT_LINK_LIBRARIES "")
 set(CMAKE_C_IMPLICIT_LINK_DIRECTORIES "")
 set(CMAKE_C_IMPLICIT_LINK_FRAMEWORK_DIRECTORIES "")

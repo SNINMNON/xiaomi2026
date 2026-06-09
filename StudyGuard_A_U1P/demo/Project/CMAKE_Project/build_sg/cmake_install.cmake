@@ -1,4 +1,4 @@
-# Install script for directory: D:/Desktop/single_board/single_board/StudyGuard_A_U1P/demo/Project/CMAKE_Project
+# Install script for directory: C:/Users/15313/Desktop/HW/intern/project/StudyGuard_A_U1P/demo/Project/CMAKE_Project
 
 # Set the install prefix
 if(NOT DEFINED CMAKE_INSTALL_PREFIX)
@@ -40,7 +40,7 @@ endif()
 string(REPLACE ";" "\n" CMAKE_INSTALL_MANIFEST_CONTENT
        "${CMAKE_INSTALL_MANIFEST_FILES}")
 if(CMAKE_INSTALL_LOCAL_ONLY)
-  file(WRITE "D:/Desktop/single_board/single_board/StudyGuard_A_U1P/demo/Project/CMAKE_Project/build_sg/install_local_manifest.txt"
+  file(WRITE "C:/Users/15313/Desktop/HW/intern/project/StudyGuard_A_U1P/demo/Project/CMAKE_Project/build_sg/install_local_manifest.txt"
      "${CMAKE_INSTALL_MANIFEST_CONTENT}")
 endif()
 if(CMAKE_INSTALL_COMPONENT)
@@ -56,6 +56,6 @@ else()
 endif()
 
 if(NOT CMAKE_INSTALL_LOCAL_ONLY)
-  file(WRITE "D:/Desktop/single_board/single_board/StudyGuard_A_U1P/demo/Project/CMAKE_Project/build_sg/${CMAKE_INSTALL_MANIFEST}"
+  file(WRITE "C:/Users/15313/Desktop/HW/intern/project/StudyGuard_A_U1P/demo/Project/CMAKE_Project/build_sg/${CMAKE_INSTALL_MANIFEST}"
      "${CMAKE_INSTALL_MANIFEST_CONTENT}")
 endif()

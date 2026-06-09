@@ -17,7 +17,7 @@
 rule ASM_COMPILER__STUDYGUARD_A_U1P_unscanned_Release
   depfile = $DEP_FILE
   deps = gcc
-  command = ${LAUNCHER}${CODE_CHECK}C:\Users\HP\scoop\apps\gcc-arm-none-eabi\current\bin\arm-none-eabi-gcc.exe $DEFINES $INCLUDES $FLAGS -MD -MT $out -MF $DEP_FILE -o $out -c $in
+  command = ${LAUNCHER}${CODE_CHECK}C:\Users\15313\scoop\apps\gcc-arm-none-eabi\current\bin\arm-none-eabi-gcc.exe $DEFINES $INCLUDES $FLAGS -MD -MT $out -MF $DEP_FILE -o $out -c $in
   description = Building ASM object $out
 
 
@@ -27,7 +27,7 @@ rule ASM_COMPILER__STUDYGUARD_A_U1P_unscanned_Release
 rule C_COMPILER__STUDYGUARD_A_U1P_unscanned_Release
   depfile = $DEP_FILE
   deps = gcc
-  command = ${LAUNCHER}${CODE_CHECK}C:\Users\HP\scoop\apps\gcc-arm-none-eabi\current\bin\arm-none-eabi-gcc.exe $DEFINES $INCLUDES $FLAGS -MD -MT $out -MF $DEP_FILE -o $out -c $in
+  command = ${LAUNCHER}${CODE_CHECK}C:\Users\15313\scoop\apps\gcc-arm-none-eabi\current\bin\arm-none-eabi-gcc.exe $DEFINES $INCLUDES $FLAGS -MD -MT $out -MF $DEP_FILE -o $out -c $in
   description = Building C object $out
 
 
@@ -35,8 +35,8 @@ rule C_COMPILER__STUDYGUARD_A_U1P_unscanned_Release
 # Rule for linking C executable.
 
 rule C_EXECUTABLE_LINKER__STUDYGUARD_A_U1P_Release
-  command = C:\WINDOWS\system32\cmd.exe /C "$PRE_LINK && C:\Users\HP\scoop\apps\gcc-arm-none-eabi\current\bin\arm-none-eabi-gcc.exe $FLAGS $LINK_FLAGS @$RSP_FILE -o $TARGET_FILE && $POST_BUILD"
-  description = Linking C executable $TARGET_FILE; Firmware size:; Generated: D:/Desktop/single_board/single_board/StudyGuard_A_U1P/demo/Project/CMAKE_Project/build_sg/STUDYGUARD_A_U1P.hex
+  command = C:\WINDOWS\system32\cmd.exe /C "$PRE_LINK && C:\Users\15313\scoop\apps\gcc-arm-none-eabi\current\bin\arm-none-eabi-gcc.exe $FLAGS $LINK_FLAGS @$RSP_FILE -o $TARGET_FILE && $POST_BUILD"
+  description = Linking C executable $TARGET_FILE; Firmware size:; Generated: C:/Users/15313/Desktop/HW/intern/project/StudyGuard_A_U1P/demo/Project/CMAKE_Project/build_sg/STUDYGUARD_A_U1P.hex
   rspfile = $RSP_FILE
   rspfile_content = $in $LINK_PATH $LINK_LIBRARIES
   restat = $RESTAT
@@ -54,7 +54,7 @@ rule CUSTOM_COMMAND
 # Rule for re-running cmake.
 
 rule RERUN_CMAKE
-  command = C:\Users\HP\scoop\apps\cmake\current\bin\cmake.exe --regenerate-during-build -SD:\Desktop\single_board\single_board\StudyGuard_A_U1P\demo\Project\CMAKE_Project -BD:\Desktop\single_board\single_board\StudyGuard_A_U1P\demo\Project\CMAKE_Project\build_sg
+  command = C:\Users\15313\scoop\apps\cmake\current\bin\cmake.exe --regenerate-during-build -SC:\Users\15313\Desktop\HW\intern\project\StudyGuard_A_U1P\demo\Project\CMAKE_Project -BC:\Users\15313\Desktop\HW\intern\project\StudyGuard_A_U1P\demo\Project\CMAKE_Project\build_sg
   description = Re-running CMake...
   generator = 1
 
@@ -63,7 +63,7 @@ rule RERUN_CMAKE
 # Rule for cleaning all built files.
 
 rule CLEAN
-  command = C:\Users\HP\scoop\shims\ninja.exe $FILE_ARG -t clean $TARGETS
+  command = C:\Users\15313\scoop\shims\ninja.exe $FILE_ARG -t clean $TARGETS
   description = Cleaning all built files...
 
 
@@ -71,6 +71,6 @@ rule CLEAN
 # Rule for printing all primary targets available.
 
 rule HELP
-  command = C:\Users\HP\scoop\shims\ninja.exe -t targets
+  command = C:\Users\15313\scoop\shims\ninja.exe -t targets
   description = All primary targets available:
 

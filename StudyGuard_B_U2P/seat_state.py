@@ -65,10 +65,14 @@ class Seat:
         old_raw = self.raw_human
         self.raw_human = value
 
-        if value == old_raw:
-            # 值没变, 取消防抖
+        if value == self.human:
+            # 信号回到当前已确认状态, 取消未完成的防抖.
             self.debounce_start = None
             self.debounce_target = None
+            return None
+
+        if value == old_raw:
+            # 周期性上报同一原始值时保持已有防抖计时.
             return None
 
         # 值发生了变化, 启动防抖

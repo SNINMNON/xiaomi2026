@@ -170,6 +170,14 @@ class C2Receiver:
             # 方法1: 解析 0xFC HEX 帧
             idx = self._buf.find(bytes([_FRAME_HEADER]))
             if idx >= 0:
+                if idx > 0:
+                    self._buf = self._buf[idx:]
+                    idx = 0
+                if len(self._buf) < 2:
+                    break
+                total_len = self._buf[1]
+                if total_len >= 2 and len(self._buf) < 2 + total_len:
+                    break
                 payload = self._try_fc(idx)
                 if payload is not None:
                     self._extract_text(payload)

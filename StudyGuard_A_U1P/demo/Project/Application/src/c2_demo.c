@@ -19,6 +19,9 @@
 static uint16_t uart_print(uint32_t usart_periph, uint8_t *data, uint16_t len);
 static void debug_printf(uint32_t usart_periph, char *string);
 static void send_frame(const char *frame);
+static void print_board_addr(const char *name, i2c_addr_def addr);
+static void print_i2c_scan(void);
+static void print_c2_probe(void);
 static void format_fixed1(char *dst, int32_t scaled10);
 static void format_card_id(char *dst, const uint8_t *uid);
 static void report_human(void);
@@ -52,6 +55,11 @@ int main(void)
 	sprintf((char *)print_buffer, "[I2C] S7=%d S5=%d S8=%d\r\n",
 	        s7_addr.flag, s5_addr.flag, s8_addr.flag);
 	debug_printf(EVAL_COM0, (char *)print_buffer);
+	print_board_addr("S7", s7_addr);
+	print_board_addr("S5", s5_addr);
+	print_board_addr("S8", s8_addr);
+	print_i2c_scan();
+	print_c2_probe();
 
 	if(c2_init(TERMINAL)) {
 		debug_printf(EVAL_COM0, "[C2] init ok, mode=TERMINAL\r\n");
@@ -86,6 +94,68 @@ static void send_frame(const char *frame)
 	c2_broadcast_data((char *)frame, 0x01);
 	sprintf((char *)print_buffer, "[TX] %s\r\n", frame);
 	debug_printf(EVAL_COM0, (char *)print_buffer);
+}
+
+static void print_board_addr(const char *name, i2c_addr_def addr)
+{
+	const char *bus = "-";
+
+	if(addr.flag) {
+		if(addr.periph == I2C0) {
+			bus = "I2C0";
+		} else if(addr.periph == I2C1) {
+			bus = "I2C1";
+		}
+		sprintf((char *)print_buffer, "[I2C] %s found bus=%s addr=0x%02X\r\n",
+		        name, bus, addr.addr);
+	} else {
+		sprintf((char *)print_buffer, "[I2C] %s not found\r\n", name);
+	}
+	debug_printf(EVAL_COM0, (char *)print_buffer);
+}
+
+static void print_i2c_scan(void)
+{
+	uint8_t addr;
+	uint8_t found = 0;
+
+	debug_printf(EVAL_COM0, "[I2C_SCAN] begin\r\n");
+	for(addr = 0x20; addr <= 0x96; addr += 2) {
+		if(i2c_addr_poll(I2C0, addr)) {
+			sprintf((char *)print_buffer, "[I2C_SCAN] I2C0 addr=0x%02X\r\n", addr);
+			debug_printf(EVAL_COM0, (char *)print_buffer);
+			found = 1;
+		}
+		if(i2c_addr_poll(I2C1, addr)) {
+			sprintf((char *)print_buffer, "[I2C_SCAN] I2C1 addr=0x%02X\r\n", addr);
+			debug_printf(EVAL_COM0, (char *)print_buffer);
+			found = 1;
+		}
+	}
+	if(!found) {
+		debug_printf(EVAL_COM0, "[I2C_SCAN] none\r\n");
+	}
+	debug_printf(EVAL_COM0, "[I2C_SCAN] end\r\n");
+}
+
+static void print_c2_probe(void)
+{
+	uint8_t i;
+	uint8_t len;
+	uint8_t recvdata[50];
+	uint8_t read_device_data[4] = {0xFE, 0x01, 0xFE, 0xFF};
+
+	memset(recvdata, 0, sizeof(recvdata));
+	uart_send_bytes(USART0, read_device_data, sizeof(read_device_data));
+	len = uart_rece_bytes(USART0, recvdata, sizeof(recvdata), 1000);
+
+	sprintf((char *)print_buffer, "[C2_PROBE] len=%d data=", len);
+	debug_printf(EVAL_COM0, (char *)print_buffer);
+	for(i = 0; i < len; i++) {
+		sprintf((char *)print_buffer, "%02X", recvdata[i]);
+		debug_printf(EVAL_COM0, (char *)print_buffer);
+	}
+	debug_printf(EVAL_COM0, "\r\n");
 }
 
 static void format_fixed1(char *dst, int32_t scaled10)

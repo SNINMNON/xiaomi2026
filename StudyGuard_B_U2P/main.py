@@ -94,6 +94,7 @@ def main():
                 frame = rcv.get_frame()
                 if frame is None:
                     break
+                print(f"[RX] {frame}")
                 for sid, old, new in sm.handle_frame(frame):
                     print(f"[状态] {sid}: {old.value} -> {new.value}")
                 if frame.get('type') == 'ENV' and sm.bad_env:
