@@ -6,15 +6,17 @@
 #include "s5.h"
 #include "s7.h"
 #include "s8.h"
+#include "s1.h"
 #include "uart.h"
 #include "stdio.h"
 #include "string.h"
 
-#define STUDYGUARD_SEAT_ID       "A01"
 #define HUMAN_REPORT_MS          1000U
 #define ENV_REPORT_MS            3000U
 #define HEARTBEAT_REPORT_MS      30000U
 #define S7_ACTIVE_HIGH           1U
+#define DEFAULT_ACTIVE_SEAT      "A01"
+#define C2_FRAME_GAP_MS          120U
 
 static uint16_t uart_print(uint32_t usart_periph, uint8_t *data, uint16_t len);
 static void debug_printf(uint32_t usart_periph, char *string);
@@ -33,15 +35,21 @@ static void report_human(void);
 static void report_env(void);
 static void report_rfid(void);
 static void report_heartbeat(void);
+static void report_seat_key(void);
+static const char *seat_id_from_key(uint8_t key);
 
 static uint8_t print_buffer[160];
+static i2c_addr_def s1_addr;
 static i2c_addr_def s5_addr;
 static i2c_addr_def s7_addr;
 static i2c_addr_def s8_addr;
+static uint8_t last_s1_link = 0xFF;
 static uint8_t last_s7_link = 0xFF;
 static uint8_t last_s5_link = 0xFF;
 static uint8_t last_s8_link = 0xFF;
 static uint8_t last_human = 0xFF;
+static uint8_t last_key = SWN;
+static char active_seat_id[4] = DEFAULT_ACTIVE_SEAT;
 static uint8_t card_present = 0;
 static uint8_t last_card_uid[4] = {0};
 
@@ -56,13 +64,15 @@ int main(void)
 	sprintf((char *)print_buffer, "[BOOT] StudyGuard A U1P start\r\n");
 	debug_printf(EVAL_COM0, (char *)print_buffer);
 
+	s1_addr = s1_init(HT16K33_ADDRESS_S1);
 	s7_addr = s7_init(PCA9557_ADDRESS_S7);
 	s5_addr = s5_init(MS523_ADDRESS_S5);
 	s8_addr = s8_init(TH_ADDRESS_S8);
 
-	sprintf((char *)print_buffer, "[I2C] S7=%d S5=%d S8=%d\r\n",
-	        s7_addr.flag, s5_addr.flag, s8_addr.flag);
+	sprintf((char *)print_buffer, "[I2C] S1=%d S7=%d S5=%d S8=%d\r\n",
+	        s1_addr.flag, s7_addr.flag, s5_addr.flag, s8_addr.flag);
 	debug_printf(EVAL_COM0, (char *)print_buffer);
+	print_board_addr("S1", s1_addr);
 	print_board_addr("S7", s7_addr);
 	print_board_addr("S5", s5_addr);
 	print_board_addr("S8", s8_addr);
@@ -85,6 +95,7 @@ int main(void)
 		elapsed_ms += HUMAN_REPORT_MS;
 
 		refresh_sensor_links();
+		report_seat_key();
 		report_human();
 		report_rfid();
 
@@ -101,6 +112,7 @@ int main(void)
 static void send_frame(const char *frame)
 {
 	c2_broadcast_data((char *)frame, 0x01);
+	delay_ms(C2_FRAME_GAP_MS);
 	sprintf((char *)print_buffer, "[TX] %s\r\n", frame);
 	debug_printf(EVAL_COM0, (char *)print_buffer);
 }
@@ -148,6 +160,22 @@ static void log_sensor_link(const char *name, i2c_addr_def addr)
 static void refresh_sensor_links(void)
 {
 	i2c_addr_def found;
+
+	found = find_board_addr(HT16K33_ADDRESS_S1);
+	if(found.flag && !same_board_addr(found, s1_addr)) {
+		s1_addr = s1_init(HT16K33_ADDRESS_S1);
+		if(!s1_addr.flag) {
+			s1_addr = found;
+		}
+	}
+	if(!found.flag) {
+		s1_addr = make_missing_addr();
+		last_key = SWN;
+	}
+	if(last_s1_link != s1_addr.flag) {
+		last_s1_link = s1_addr.flag;
+		log_sensor_link("S1", s1_addr);
+	}
 
 	found = find_board_addr(PCA9557_ADDRESS_S7);
 	if(found.flag && !same_board_addr(found, s7_addr)) {
@@ -299,7 +327,7 @@ static void report_human(void)
 
 	if(human != last_human) {
 		last_human = human;
-		sprintf(frame, "HUMAN,seat=%s,value=%d", STUDYGUARD_SEAT_ID, human);
+		sprintf(frame, "HUMAN,seat=%s,value=%d", active_seat_id, human);
 		send_frame(frame);
 	} else {
 		sprintf((char *)print_buffer, "[S7] raw=0x%02X d0=%d human=%d\r\n",
@@ -346,7 +374,7 @@ static void report_rfid(void)
 			memcpy(last_card_uid, uid, 4);
 			card_present = 1;
 			format_card_id(card_text, uid);
-			sprintf(frame, "RFID,seat=%s,card=%s,event=scan", STUDYGUARD_SEAT_ID, card_text);
+			sprintf(frame, "RFID,seat=%s,card=%s,event=scan", active_seat_id, card_text);
 			send_frame(frame);
 		}
 	} else {
@@ -360,8 +388,51 @@ static void report_heartbeat(void)
 {
 	char frame[64];
 
-	sprintf(frame, "HB,u1p=ok,s7=%d,s5=%d,s8=%d",
-	        s7_addr.flag, s5_addr.flag, s8_addr.flag);
+	sprintf(frame, "HB,u1p=ok,seat=%s,s1=%d,s7=%d,s5=%d,s8=%d",
+	        active_seat_id, s1_addr.flag, s7_addr.flag, s5_addr.flag, s8_addr.flag);
+	send_frame(frame);
+}
+
+static const char *seat_id_from_key(uint8_t key)
+{
+	switch(key) {
+	case SW1:
+		return "A01";
+	case SW2:
+		return "A02";
+	case SW3:
+		return "A03";
+	case SW4:
+		return "A04";
+	default:
+		return 0;
+	}
+}
+
+static void report_seat_key(void)
+{
+	uint8_t key;
+	const char *seat_id;
+	char frame[64];
+
+	if(!s1_addr.flag) {
+		return;
+	}
+
+	key = s1_key_scan(s1_addr.periph, s1_addr.addr);
+	if(key == last_key) {
+		return;
+	}
+	last_key = key;
+
+	seat_id = seat_id_from_key(key);
+	if(seat_id == 0) {
+		return;
+	}
+
+	strcpy(active_seat_id, seat_id);
+	last_human = 0xFF;
+	sprintf(frame, "SEAT,seat=%s,key=%d", active_seat_id, key);
 	send_frame(frame);
 }
 

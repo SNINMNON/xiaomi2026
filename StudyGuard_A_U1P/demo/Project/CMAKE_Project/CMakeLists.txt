@@ -35,6 +35,7 @@ add_executable(${PROJECT_NAME}
     ${CMAKE_CURRENT_SOURCE_DIR}/../GD32F470Z_BSP/src/s5.c
     ${CMAKE_CURRENT_SOURCE_DIR}/../GD32F470Z_BSP/src/s7.c
     ${CMAKE_CURRENT_SOURCE_DIR}/../GD32F470Z_BSP/src/s8.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/../GD32F470Z_BSP/src/s1.c
     ${CMAKE_CURRENT_SOURCE_DIR}/../GD32F470Z_BSP/src/gd32f470z_eval.c
     ${CMAKE_CURRENT_SOURCE_DIR}/../../../Library/Firmware/GD32F4xx_standard_peripheral/Source/gd32f4xx_adc.c
     ${CMAKE_CURRENT_SOURCE_DIR}/../../../Library/Firmware/GD32F4xx_standard_peripheral/Source/gd32f4xx_can.c

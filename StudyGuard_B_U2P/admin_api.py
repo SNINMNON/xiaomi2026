@@ -30,6 +30,7 @@ class AdminAPI:
             return {
                 "ok": True,
                 "seats": seats,
+                "active_seat": self.sm.get_active_seat(),
                 "env": self.sm.get_env(),
                 "config": self.get_config(),
                 "updated_at": time.time(),
@@ -40,7 +41,7 @@ class AdminAPI:
             seat = self.sm.get_seat(seat_id)
             if seat is None:
                 raise ApiError(404, "seat not found")
-            return {"ok": True, "seat": self._decorate_seat(seat)}
+            return {"ok": True, "seat": self._decorate_seat(seat), "active_seat": self.sm.get_active_seat()}
 
     def get_env(self):
         with self.lock:

@@ -106,6 +106,8 @@ INDEX_HTML = r"""<!doctype html>
     }
     .seat:focus { outline: 3px solid rgba(29, 78, 216, .22); }
     .seat.selected { border-color: var(--focus); box-shadow: 0 0 0 2px rgba(29, 78, 216, .12); }
+    .seat.active { background: #f2fbf7; }
+    .seat.warning { background: #fff8e6; border-color: #f0c66a; }
     .seat.RESERVED { border-left-color: var(--reserved); }
     .seat.USING { border-left-color: var(--using); }
     .seat.AWAY { border-left-color: var(--away); }
@@ -167,6 +169,7 @@ INDEX_HTML = r"""<!doctype html>
     <div class="env">
       <span class="badge" id="temp">温度 --</span>
       <span class="badge" id="humi">湿度 --</span>
+      <span class="badge" id="activeSeat">传感器 --</span>
       <span class="badge" id="envFlag">环境正常</span>
     </div>
   </header>
@@ -197,6 +200,7 @@ INDEX_HTML = r"""<!doctype html>
   <script>
     let seats = [];
     let selectedSeat = null;
+    let activeSeat = null;
 
     function qs(id) { return document.getElementById(id); }
     function stateClass(state) { return ["EMPTY","RESERVED","USING","AWAY","OCCUPY"].includes(state) ? state : "EMPTY"; }
@@ -222,12 +226,15 @@ INDEX_HTML = r"""<!doctype html>
       grid.innerHTML = "";
       seats.forEach((seat) => {
         const btn = document.createElement("button");
-        btn.className = "seat " + stateClass(seat.state) + (seat.seat === selectedSeat ? " selected" : "");
+        btn.className = "seat " + stateClass(seat.state) +
+          (seat.seat === selectedSeat ? " selected" : "") +
+          (seat.active ? " active" : "") +
+          (seat.warning ? " warning" : "");
         btn.type = "button";
         btn.innerHTML =
           '<div class="seat-name">' + seat.seat + '</div>' +
           '<div class="seat-state">' + (seat.state_label || seat.state) + '</div>' +
-          '<div class="seat-meta">' + (seat.human_label || "") + ' / 卡 ' + (seat.card || "-") + '</div>';
+          '<div class="seat-meta">' + (seat.warning_label || seat.human_label || "") + ' / 卡 ' + (seat.card || "-") + '</div>';
         btn.onclick = () => { selectedSeat = seat.seat; renderSeats(); renderDetail(); };
         grid.appendChild(btn);
       });
@@ -248,6 +255,7 @@ INDEX_HTML = r"""<!doctype html>
       detail.innerHTML =
         row("座位", seat.seat) +
         row("状态", seat.state_label || seat.state) +
+        (seat.warning_label ? row("提示", seat.warning_label) : "") +
         row("卡号", seat.card || "-") +
         row("人体感应", seat.human_label || "-") +
         row("离开计时", Number(seat.away_seconds || 0).toFixed(1) + " 秒");
@@ -263,7 +271,9 @@ INDEX_HTML = r"""<!doctype html>
       try {
         const data = await requestJson("/api/seats");
         seats = data.seats || [];
+        activeSeat = data.active_seat || null;
         renderEnv(data.env || {});
+        qs("activeSeat").textContent = "传感器 " + (activeSeat || "--");
         if (data.config) qs("timeoutInput").value = data.config.away_timeout;
         if (selectedSeat && !seats.find((s) => s.seat === selectedSeat)) selectedSeat = null;
         renderSeats();

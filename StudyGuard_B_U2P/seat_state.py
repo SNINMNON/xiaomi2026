@@ -3,6 +3,7 @@
 
 职责:
   - 维护每个座位的状态: EMPTY / RESERVED / USING / AWAY / OCCUPY
+  - 维护 S1 按键选择的当前传感器对应座位
   - 根据人体感应、刷卡信息和计时器驱动状态转换
   - 监测温湿度, 判断 BAD_ENV 环境异常
   - 对外提供查询和管理接口 (供成员 C 的 UI / HTTP 模块调用)
@@ -114,9 +115,6 @@ class Seat:
         elif self.state == SeatState.RESERVED:
             if self.card == card:
                 self._release()
-            else:
-                self.card = card
-                self.reserve_start = time.time()
 
         elif self.state == SeatState.USING:
             if self.card == card:
@@ -196,12 +194,19 @@ class Seat:
         return 0.0
 
     def to_dict(self):
+        warning = None
+        warning_label = None
+        if self.state == SeatState.EMPTY and self.human:
+            warning = 'UNRESERVED_HUMAN'
+            warning_label = '未预约有人'
         return {
             'seat': self.seat_id,
             'state': self.state.value,
             'card': self.card,
             'human': self.human,
             'away_seconds': round(self.away_seconds, 1),
+            'warning': warning,
+            'warning_label': warning_label,
         }
 
 
@@ -227,11 +232,14 @@ class SeatStateMachine:
         self.temp = 25.0
         self.humi = 50.0
         self.bad_env = False
+        self.active_seat = seat_ids[0] if seat_ids else 'A01'
         self.away_timeout = away_timeout
         self.reserve_timeout = reserve_timeout
         if seat_ids:
             for sid in seat_ids:
                 self.add_seat(sid)
+        elif self.active_seat:
+            self.add_seat(self.active_seat)
 
     def add_seat(self, seat_id):
         self.seats[seat_id] = Seat(seat_id, self.away_timeout, self.reserve_timeout)
@@ -250,16 +258,47 @@ class SeatStateMachine:
             list[(seat_id, old_state, new_state)]  状态变化列表
         """
         ftype = frame.get('type', '')
-        if ftype == 'HUMAN':
+        if ftype == 'SEAT':
+            self._on_seat_select(frame)
+        elif ftype == 'HUMAN':
             return self._on_human(frame)
         elif ftype == 'RFID':
             return self._on_rfid(frame)
         elif ftype == 'ENV':
             self._on_env(frame)
+        elif ftype == 'HB':
+            self._sync_active_seat(frame)
         return []
 
+    def _resolve_seat_id(self, frame):
+        seat_id = frame.get('seat')
+        if seat_id:
+            self._set_active_seat(seat_id)
+            return seat_id
+        return self.active_seat or 'A01'
+
+    def _set_active_seat(self, seat_id):
+        if not seat_id:
+            return
+        if seat_id not in self.seats:
+            self.add_seat(seat_id)
+        self.active_seat = seat_id
+
+    def _sync_active_seat(self, frame):
+        self._set_active_seat(frame.get('seat'))
+
+    def _on_seat_select(self, frame):
+        seat_id = frame.get('seat')
+        if not seat_id:
+            key = frame.get('key')
+            if isinstance(key, int) and 1 <= key <= 9:
+                seat_id = 'A%02d' % key
+        if not seat_id:
+            return
+        self._set_active_seat(seat_id)
+
     def _on_human(self, frame):
-        seat_id = frame.get('seat', 'A01')
+        seat_id = self._resolve_seat_id(frame)
         value = frame.get('value', 0)
         if seat_id not in self.seats:
             self.add_seat(seat_id)
@@ -271,7 +310,7 @@ class SeatStateMachine:
         return []
 
     def _on_rfid(self, frame):
-        seat_id = frame.get('seat', 'A01')
+        seat_id = self._resolve_seat_id(frame)
         card = frame.get('card', '')
         if seat_id not in self.seats:
             self.add_seat(seat_id)
@@ -286,10 +325,25 @@ class SeatStateMachine:
 
         seat = self.seats[seat_id]
         old = seat.state
+        conflict = self._find_card_binding(card, exclude_seat_id=seat_id)
+        if conflict is not None:
+            return []
+        if seat.state == SeatState.RESERVED and seat.card != card:
+            return []
         result = seat.on_rfid(card)
         if result:
             return [(seat_id, old, seat.state)]
         return []
+
+    def _find_card_binding(self, card, exclude_seat_id=None):
+        if not card:
+            return None
+        for sid, seat in self.seats.items():
+            if sid == exclude_seat_id:
+                continue
+            if seat.card == card and seat.state != SeatState.EMPTY:
+                return sid
+        return None
 
     def _on_env(self, frame):
         self.temp = frame.get('temp', self.temp)
@@ -317,6 +371,7 @@ class SeatStateMachine:
         if seat is None:
             return None
         d = seat.to_dict()
+        d['active'] = (seat_id == self.active_seat)
         d['temp'] = self.temp
         d['humi'] = self.humi
         d['bad_env'] = self.bad_env
@@ -327,6 +382,9 @@ class SeatStateMachine:
 
     def get_env(self):
         return {'temp': self.temp, 'humi': self.humi, 'bad_env': self.bad_env}
+
+    def get_active_seat(self):
+        return self.active_seat
 
     def admin_clear_occupy(self, seat_id):
         seat = self.seats.get(seat_id)

@@ -6,9 +6,10 @@ C2 ZigBee 数据接收与解析模块 (U2P 侧).
   - 初始化 C2 为协调器 (COORDINATOR, PAN_ID=0x3F2C)
   - 后台线程持续接收 C2 转发的 ZigBee 广播数据
   - 解析 HEX 帧 (0xFC) 并提取文本负载
-  - 将 HUMAN / RFID / ENV / HB 文本帧解析为结构化字典
+  - 将 SEAT / HUMAN / RFID / ENV / HB 文本帧解析为结构化字典
 
 协议约定 (来自成员 A):
+  SEAT,seat=A01,key=1              # S1 按键选择当前座位
   HUMAN,seat=A01,value=0        # 人体感应, 0=无人 1=有人
   RFID,seat=A01,card=64680264,event=scan   # 刷卡
   ENV,temp=27.5,humi=63.4       # 温湿度
@@ -35,7 +36,7 @@ _CMD_SET_PAN_ID     = bytes([0xFD, 0x03, 0x03, 0x3F, 0x2C, 0xFF])
 _CMD_SET_GROUP      = bytes([0xFD, 0x02, 0x09, 0x01, 0xFF])
 
 _FRAME_HEADER = 0xFC
-_TEXT_PREFIXES = (b'HUMAN', b'RFID', b'ENV', b'HB')
+_TEXT_PREFIXES = (b'SEAT', b'HUMAN', b'RFID', b'ENV', b'HB')
 
 
 def parse_frame(text):
@@ -56,7 +57,7 @@ def parse_frame(text):
             continue
         k, v = kv.split('=', 1)
         k, v = k.strip(), v.strip()
-        if k == 'value':
+        if k in ('value', 'key'):
             result[k] = int(v)
         elif k in ('temp', 'humi'):
             result[k] = float(v)
@@ -198,19 +199,19 @@ class C2Receiver:
                 progress = True
                 continue
 
-            # 方法2: 搜索文本前缀 (回退策略)
-            for prefix in _TEXT_PREFIXES:
-                idx = self._buf.find(prefix)
-                if idx >= 0:
-                    line = self._slice_line(idx)
-                    if line:
-                        parsed = parse_frame(line)
-                        if parsed:
-                            with self._lock:
-                                self._queue.append(parsed)
-                    self._buf = self._buf[idx + len(line):]
-                    progress = True
-                    break
+            # 方法2: 搜索最早出现的文本前缀 (回退策略)
+            hits = [(self._buf.find(prefix), prefix) for prefix in _TEXT_PREFIXES]
+            hits = [(pos, prefix) for pos, prefix in hits if pos >= 0]
+            if hits:
+                idx, _ = min(hits, key=lambda x: x[0])
+                line = self._slice_line(idx)
+                if line:
+                    parsed = parse_frame(line)
+                    if parsed:
+                        with self._lock:
+                            self._queue.append(parsed)
+                self._buf = self._buf[idx + len(line):]
+                progress = True
 
             if not progress:
                 break
@@ -241,24 +242,26 @@ class C2Receiver:
     def _extract_text(self, data):
         """从二进制负载中提取文本帧."""
         text = data.decode('ascii', errors='ignore')
-        for prefix in _TEXT_PREFIXES:
-            p = prefix.decode()
-            pos = text.find(p)
-            while pos >= 0:
-                end = len(text)
-                for other in ('HUMAN', 'RFID', 'ENV', 'HB'):
-                    if other == p:
-                        continue
-                    o = text.find(other, pos + 1)
-                    if 0 < o < end:
-                        end = o
-                line = text[pos:end].strip()
-                parsed = parse_frame(line)
-                if parsed:
-                    with self._lock:
-                        self._queue.append(parsed)
-                text = text[end:]
-                pos = text.find(p)
+        prefixes = [p.decode() for p in _TEXT_PREFIXES]
+        while text:
+            hits = [(text.find(prefix), prefix) for prefix in prefixes]
+            hits = [(pos, prefix) for pos, prefix in hits if pos >= 0]
+            if not hits:
+                break
+            pos, current = min(hits, key=lambda x: x[0])
+            end = len(text)
+            for other in prefixes:
+                if other == current:
+                    continue
+                o = text.find(other, pos + 1)
+                if 0 < o < end:
+                    end = o
+            line = text[pos:end].strip()
+            parsed = parse_frame(line)
+            if parsed:
+                with self._lock:
+                    self._queue.append(parsed)
+            text = text[end:]
 
     def _slice_line(self, idx):
         """从 buffer[idx] 切出一行文本."""
