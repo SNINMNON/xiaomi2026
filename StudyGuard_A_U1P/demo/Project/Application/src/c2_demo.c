@@ -13,12 +13,17 @@
 #define STUDYGUARD_SEAT_ID       "A01"
 #define HUMAN_REPORT_MS          1000U
 #define ENV_REPORT_MS            3000U
-#define HEARTBEAT_REPORT_MS      10000U
+#define HEARTBEAT_REPORT_MS      30000U
 #define S7_ACTIVE_HIGH           1U
 
 static uint16_t uart_print(uint32_t usart_periph, uint8_t *data, uint16_t len);
 static void debug_printf(uint32_t usart_periph, char *string);
 static void send_frame(const char *frame);
+static i2c_addr_def make_missing_addr(void);
+static i2c_addr_def find_board_addr(uint8_t base_addr);
+static uint8_t same_board_addr(i2c_addr_def a, i2c_addr_def b);
+static void refresh_sensor_links(void);
+static void log_sensor_link(const char *name, i2c_addr_def addr);
 static void print_board_addr(const char *name, i2c_addr_def addr);
 static void print_i2c_scan(void);
 static void print_c2_probe(void);
@@ -33,6 +38,9 @@ static uint8_t print_buffer[160];
 static i2c_addr_def s5_addr;
 static i2c_addr_def s7_addr;
 static i2c_addr_def s8_addr;
+static uint8_t last_s7_link = 0xFF;
+static uint8_t last_s5_link = 0xFF;
+static uint8_t last_s8_link = 0xFF;
 static uint8_t last_human = 0xFF;
 static uint8_t card_present = 0;
 static uint8_t last_card_uid[4] = {0};
@@ -76,6 +84,7 @@ int main(void)
 		delay_ms(HUMAN_REPORT_MS);
 		elapsed_ms += HUMAN_REPORT_MS;
 
+		refresh_sensor_links();
 		report_human();
 		report_rfid();
 
@@ -94,6 +103,99 @@ static void send_frame(const char *frame)
 	c2_broadcast_data((char *)frame, 0x01);
 	sprintf((char *)print_buffer, "[TX] %s\r\n", frame);
 	debug_printf(EVAL_COM0, (char *)print_buffer);
+}
+
+static i2c_addr_def make_missing_addr(void)
+{
+	i2c_addr_def addr;
+
+	addr.flag = 0;
+	addr.periph = 0;
+	addr.addr = 0;
+	return addr;
+}
+
+static i2c_addr_def find_board_addr(uint8_t base_addr)
+{
+	uint8_t i;
+	i2c_addr_def addr;
+
+	for(i = 0; i < 4; i++) {
+		addr = get_board_address(base_addr + i * 2);
+		if(addr.flag) {
+			return addr;
+		}
+	}
+
+	return make_missing_addr();
+}
+
+static uint8_t same_board_addr(i2c_addr_def a, i2c_addr_def b)
+{
+	return (a.flag == b.flag) && (a.periph == b.periph) && (a.addr == b.addr);
+}
+
+static void log_sensor_link(const char *name, i2c_addr_def addr)
+{
+	if(addr.flag) {
+		print_board_addr(name, addr);
+	} else {
+		sprintf((char *)print_buffer, "[SCHK] %s disconnected\r\n", name);
+		debug_printf(EVAL_COM0, (char *)print_buffer);
+	}
+}
+
+static void refresh_sensor_links(void)
+{
+	i2c_addr_def found;
+
+	found = find_board_addr(PCA9557_ADDRESS_S7);
+	if(found.flag && !same_board_addr(found, s7_addr)) {
+		s7_addr = s7_init(PCA9557_ADDRESS_S7);
+		if(!s7_addr.flag) {
+			s7_addr = found;
+		}
+	}
+	if(!found.flag) {
+		s7_addr = make_missing_addr();
+		last_human = 0xFF;
+	}
+	if(last_s7_link != s7_addr.flag) {
+		last_s7_link = s7_addr.flag;
+		log_sensor_link("S7", s7_addr);
+	}
+
+	found = find_board_addr(MS523_ADDRESS_S5);
+	if(found.flag && !same_board_addr(found, s5_addr)) {
+		s5_addr = s5_init(MS523_ADDRESS_S5);
+		if(!s5_addr.flag) {
+			s5_addr = found;
+		}
+	}
+	if(!found.flag) {
+		s5_addr = make_missing_addr();
+		card_present = 0;
+		memset(last_card_uid, 0, sizeof(last_card_uid));
+	}
+	if(last_s5_link != s5_addr.flag) {
+		last_s5_link = s5_addr.flag;
+		log_sensor_link("S5", s5_addr);
+	}
+
+	found = find_board_addr(TH_ADDRESS_S8);
+	if(found.flag && !same_board_addr(found, s8_addr)) {
+		s8_addr = s8_init(TH_ADDRESS_S8);
+		if(!s8_addr.flag) {
+			s8_addr = found;
+		}
+	}
+	if(!found.flag) {
+		s8_addr = make_missing_addr();
+	}
+	if(last_s8_link != s8_addr.flag) {
+		last_s8_link = s8_addr.flag;
+		log_sensor_link("S8", s8_addr);
+	}
 }
 
 static void print_board_addr(const char *name, i2c_addr_def addr)
@@ -256,7 +358,11 @@ static void report_rfid(void)
 
 static void report_heartbeat(void)
 {
-	send_frame("HB,u1p=ok");
+	char frame[64];
+
+	sprintf(frame, "HB,u1p=ok,s7=%d,s5=%d,s8=%d",
+	        s7_addr.flag, s5_addr.flag, s8_addr.flag);
+	send_frame(frame);
 }
 
 static uint16_t uart_print(uint32_t usart_periph, uint8_t *data, uint16_t len)

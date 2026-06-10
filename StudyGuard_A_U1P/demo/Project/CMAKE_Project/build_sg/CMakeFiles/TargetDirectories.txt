@@ -1,3 +1,0 @@
-C:/Users/15313/Desktop/HW/intern/project/StudyGuard_A_U1P/demo/Project/CMAKE_Project/build_sg/CMakeFiles/STUDYGUARD_A_U1P.dir
-C:/Users/15313/Desktop/HW/intern/project/StudyGuard_A_U1P/demo/Project/CMAKE_Project/build_sg/CMakeFiles/edit_cache.dir
-C:/Users/15313/Desktop/HW/intern/project/StudyGuard_A_U1P/demo/Project/CMAKE_Project/build_sg/CMakeFiles/rebuild_cache.dir

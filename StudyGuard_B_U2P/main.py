@@ -1,20 +1,20 @@
-"""
-StudyGuard U2P 端主程序 (成员 B 交付版本).
-
-启动 C2 数据接收 + 座位状态机, 终端打印状态变化.
-成员 C 将在此基础上集成 E5 触摸屏 UI 和 HTTP 管理服务.
-
-用法:
-  python main.py --port /dev/ttyS1 --seat A01,A02 --away-timeout 30
-"""
-
 import argparse
 import signal
-import sys
+import threading
 import time
 
+from admin_api import AdminAPI
 from c2_receiver import C2Receiver
+from config import (
+    DEFAULT_AWAY_TIMEOUT,
+    DEFAULT_HTTP_HOST,
+    DEFAULT_HTTP_PORT,
+    DEFAULT_RESERVE_TIMEOUT,
+    DEFAULT_SEATS,
+)
+from http_server import start_http_server
 from seat_state import SeatState, SeatStateMachine
+from ui_touch import launch_touch_ui
 
 
 _STATE_COLORS = {
@@ -26,13 +26,19 @@ _STATE_COLORS = {
 }
 
 
-def print_status(sm):
-    env = sm.get_env()
+def print_status(sm, lock=None):
+    if lock is None:
+        env = sm.get_env()
+        seats = sm.get_all_seats()
+    else:
+        with lock:
+            env = sm.get_env()
+            seats = sm.get_all_seats()
     flag = ' \033[31m[BAD_ENV]\033[0m' if env['bad_env'] else ''
     print(f"\n{'='*58}")
     print(f"  StudyGuard  温度:{env['temp']:.1f}C  湿度:{env['humi']:.1f}%RH{flag}")
     print(f"  {'-'*54}")
-    for s in sm.get_all_seats():
+    for s in seats:
         st = SeatState(s['state'])
         card = s['card'] or '-'
         human = '有人' if s['human'] else '无人'
@@ -42,18 +48,35 @@ def print_status(sm):
 
 
 def main():
-    p = argparse.ArgumentParser(description='StudyGuard U2P 状态管理')
+    p = argparse.ArgumentParser(description='StudyGuard U2P 集成管理终端')
     p.add_argument('--port', default='/dev/ttyS1', help='C2 串口路径')
     p.add_argument('--baud', type=int, default=115200)
-    p.add_argument('--seat', default='A01', help='座位列表, 逗号分隔')
-    p.add_argument('--away-timeout', type=float, default=30.0)
-    p.add_argument('--reserve-timeout', type=float, default=60.0)
+    p.add_argument('--seat', default=DEFAULT_SEATS, help='座位列表, 逗号分隔')
+    p.add_argument('--away-timeout', type=float, default=DEFAULT_AWAY_TIMEOUT)
+    p.add_argument('--reserve-timeout', type=float, default=DEFAULT_RESERVE_TIMEOUT)
+    p.add_argument('--http-host', default=DEFAULT_HTTP_HOST)
+    p.add_argument('--http-port', type=int, default=DEFAULT_HTTP_PORT)
+    p.add_argument('--no-http', action='store_true', help='不启动手机端 HTTP 管理服务')
+    p.add_argument('--open-ui', action='store_true', help='启动后在本机打开 E5/本地管理页面')
+    p.add_argument('--kiosk', action='store_true', help='用 Chromium kiosk 模式打开 E5 页面')
+    p.add_argument('--browser', default=None, help='指定本地浏览器路径')
     args = p.parse_args()
 
     seat_ids = [x.strip() for x in args.seat.split(',') if x.strip()]
 
     sm = SeatStateMachine(seat_ids, args.away_timeout, args.reserve_timeout)
+    state_lock = threading.RLock()
+    api = AdminAPI(sm, state_lock)
     print(f"[SM] 座位: {seat_ids}  离开超时: {args.away_timeout}s  预约超时: {args.reserve_timeout}s")
+
+    httpd = None
+    if not args.no_http:
+        httpd = start_http_server(api, args.http_host, args.http_port)
+        print(f"[HTTP] 管理页面: http://{args.http_host}:{args.http_port}/")
+        print(f"[HTTP] 本机 E5 页面: http://127.0.0.1:{args.http_port}/")
+        if args.open_ui or args.kiosk:
+            ok, url, msg = launch_touch_ui(args.http_port, args.browser, args.kiosk)
+            print(f"[UI] {url}  {'已打开' if ok else '未打开'} ({msg})")
 
     rcv = C2Receiver(args.port, args.baud)
     has_hw = False
@@ -81,39 +104,49 @@ def main():
     signal.signal(signal.SIGINT, on_signal)
     signal.signal(signal.SIGTERM, on_signal)
 
-    print_status(sm)
+    print_status(sm, state_lock)
     last_tick = time.time()
     last_print = time.time()
 
-    while running:
-        now = time.time()
+    try:
+        while running:
+            now = time.time()
 
-        # 处理接收帧
-        if has_hw:
-            while True:
-                frame = rcv.get_frame()
-                if frame is None:
-                    break
-                print(f"[RX] {frame}")
-                for sid, old, new in sm.handle_frame(frame):
-                    print(f"[状态] {sid}: {old.value} -> {new.value}")
-                if frame.get('type') == 'ENV' and sm.bad_env:
-                    print(f"[环境] BAD_ENV  temp={sm.temp:.1f}  humi={sm.humi:.1f}")
+            # 处理接收帧
+            if has_hw:
+                while True:
+                    frame = rcv.get_frame()
+                    if frame is None:
+                        break
+                    print(f"[RX] {frame}")
+                    with state_lock:
+                        changes = sm.handle_frame(frame)
+                        bad_env = frame.get('type') == 'ENV' and sm.bad_env
+                        temp, humi = sm.temp, sm.humi
+                    for sid, old, new in changes:
+                        print(f"[状态] {sid}: {old.value} -> {new.value}")
+                    if bad_env:
+                        print(f"[环境] BAD_ENV  temp={temp:.1f}  humi={humi:.1f}")
 
-        # 定时器
-        if now - last_tick >= 1.0:
-            for sid, old, new in sm.tick():
-                print(f"[超时] {sid}: {old.value} -> {new.value}")
-            last_tick = now
+            # 定时器
+            if now - last_tick >= 1.0:
+                with state_lock:
+                    tick_changes = sm.tick()
+                for sid, old, new in tick_changes:
+                    print(f"[超时] {sid}: {old.value} -> {new.value}")
+                last_tick = now
 
-        # 周期打印
-        if now - last_print >= 5.0:
-            print_status(sm)
-            last_print = now
+            # 周期打印
+            if now - last_print >= 5.0:
+                print_status(sm, state_lock)
+                last_print = now
 
-        time.sleep(0.1)
-
-    rcv.close()
+            time.sleep(0.1)
+    finally:
+        rcv.close()
+        if httpd is not None:
+            httpd.shutdown()
+            httpd.server_close()
     print("[MAIN] 已退出")
 
 

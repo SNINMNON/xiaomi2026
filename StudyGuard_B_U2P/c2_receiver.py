@@ -15,10 +15,18 @@ C2 ZigBee 数据接收与解析模块 (U2P 侧).
   HB,u1p=ok                     # 心跳
 """
 
-import serial
 import threading
 import time
 from collections import deque
+
+try:
+    import serial
+    _SerialException = serial.SerialException
+except ModuleNotFoundError:
+    serial = None
+
+    class _SerialException(Exception):
+        pass
 
 # ---- C2 HEX 命令 ----
 _CMD_READ_DEVICE    = bytes([0xFE, 0x01, 0xFE, 0xFF])
@@ -87,6 +95,8 @@ class C2Receiver:
     # -- 串口 --
 
     def open(self):
+        if serial is None:
+            raise RuntimeError("pyserial 未安装, 请执行: pip3 install pyserial")
         self.ser = serial.Serial(
             port=self.port, baudrate=self.baudrate,
             bytesize=serial.EIGHTBITS, parity=serial.PARITY_NONE,
@@ -128,7 +138,7 @@ class C2Receiver:
                 resp = self.ser.read(32)
                 if resp.startswith(expected_prefix):
                     return True
-            except (OSError, serial.SerialException):
+            except (OSError, _SerialException):
                 pass
         return False
 
@@ -157,7 +167,7 @@ class C2Receiver:
                     self._drain()
                 else:
                     time.sleep(0.02)
-            except (OSError, serial.SerialException):
+            except (OSError, _SerialException):
                 time.sleep(0.5)
 
     # -- 帧提取 --
